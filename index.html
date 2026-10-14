@@ -256,14 +256,20 @@
       let bass = 0;
       if (analyser) { analyser.getByteFrequencyData(dataArray); bass = dataArray.slice(0,8).reduce((a,b)=>a+b,0)/8/255; }
 
-      const night = Math.max(0, Math.min(1, (time - 58) / 10));
+      const night = Math.max(0, Math.min(1, (time - 58) / 25));
       skyMat.uniforms.time.value = t;
       skyMat.uniforms.night.value = night;
       if (time > 143 && time < 147) flash = Math.min(1, flash + 0.06); else flash = Math.max(0, flash - 0.03);
       skyMat.uniforms.flash.value = flash * 0.7;
-      sunMesh.visible = night < 0.5;
-      moonMesh.visible = night > 0.25;
-      stars.material.opacity = night * 0.85;
+      // Sun fades and lowers gradually; never hard-pops off
+      sunMesh.visible = true;
+      sunMesh.position.y = THREE.MathUtils.lerp(16, -2, night);
+      sunMesh.material.opacity = Math.max(0.15, 1 - night * 0.85);
+      sunMesh.material.transparent = true;
+      moonMesh.visible = night > 0.3;
+      moonMesh.material.opacity = Math.min(1, (night - 0.3) * 2);
+      moonMesh.material.transparent = true;
+      stars.material.opacity = night * 0.9;
 
       const sway = Math.sin(t * Math.PI*2 / beat) * 0.06 * (0.5+bass);
       trees.forEach(tr => tr.rotation.z = sway * Math.sin(tr.userData.phase));
@@ -354,7 +360,7 @@
         if (time > 235) lightsOut = true;
       }
 
-      camera.position.lerp(camPos, 0.04);
+      camera.position.lerp(camPos, 0.025);
       camera.lookAt(camTarget);
 
       if (lightsOut) {
