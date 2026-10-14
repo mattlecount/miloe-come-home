@@ -16,10 +16,34 @@
     #start-screen h1 { font-size: 3rem; margin-bottom: 0.5rem; }
     #start-screen p { font-size: 1.15rem; opacity: 0.75; }
     .hidden { display: none !important; }
+
+    #rotate-prompt {
+      position: absolute; inset: 0; background: rgba(10,10,10,0.95);
+      display: none; flex-direction: column; align-items: center; justify-content: center;
+      z-index: 20; text-align: center; padding: 2rem;
+    }
+    #rotate-prompt.show { display: flex; }
+    #rotate-prompt .icon { font-size: 4rem; margin-bottom: 1rem; animation: spin 2s ease-in-out infinite; }
+    @keyframes spin { 0%,100% { transform: rotate(0deg); } 50% { transform: rotate(90deg); } }
+    #fullscreen-btn {
+      position: absolute; top: 1rem; right: 1rem; z-index: 15;
+      background: rgba(0,0,0,0.5); color: #fff; border: 1px solid rgba(255,255,255,0.3);
+      padding: 0.5rem 1rem; border-radius: 6px; cursor: pointer; font-size: 0.9rem;
+    }
+    #fullscreen-btn:hover { background: rgba(0,0,0,0.7); }
+
   </style>
 </head>
 <body>
   <canvas id="canvas"></canvas>
+
+  <div id="rotate-prompt">
+    <div class="icon">↻</div>
+    <h2>Please rotate your device</h2>
+    <p>This experience works best in landscape</p>
+  </div>
+  <button id="fullscreen-btn">Fullscreen</button>
+
   <div id="start-screen">
     <h1>Miloe, Come Home</h1>
     <p>Click to begin</p>
@@ -464,6 +488,43 @@
       renderer.render(scene, camera);
     }
     animate();
+
+
+    // Mobile landscape prompt + fullscreen
+    const rotatePrompt = document.getElementById('rotate-prompt');
+    const fsBtn = document.getElementById('fullscreen-btn');
+
+    function isMobile() {
+      return /Android|iPhone|iPad|iPod|Mobile/i.test(navigator.userAgent) || window.innerWidth < 900;
+    }
+    function checkOrientation() {
+      const portrait = window.innerHeight > window.innerWidth;
+      if (isMobile() && portrait) {
+        rotatePrompt.classList.add('show');
+      } else {
+        rotatePrompt.classList.remove('show');
+        // Auto fullscreen on landscape for mobile
+        if (isMobile() && !portrait && !document.fullscreenElement) {
+          document.documentElement.requestFullscreen?.().catch(() => {});
+        }
+      }
+    }
+    window.addEventListener('resize', checkOrientation);
+    window.addEventListener('orientationchange', () => setTimeout(checkOrientation, 100));
+    checkOrientation();
+
+    fsBtn.addEventListener('click', () => {
+      if (!document.fullscreenElement) {
+        document.documentElement.requestFullscreen?.().catch(() => {});
+        fsBtn.textContent = 'Exit';
+      } else {
+        document.exitFullscreen?.();
+        fsBtn.textContent = 'Fullscreen';
+      }
+    });
+    document.addEventListener('fullscreenchange', () => {
+      fsBtn.textContent = document.fullscreenElement ? 'Exit' : 'Fullscreen';
+    });
 
     window.addEventListener('resize', () => {
       camera.aspect = window.innerWidth / window.innerHeight;
