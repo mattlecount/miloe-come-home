@@ -105,98 +105,117 @@
     house.add(door);
     scene.add(house);
 
-    // Staffordshire-style dog: stocky, broad head, short legs, gray + white markings, blue collar
+// Detailed Staffordshire Bull Terrier
     function createDog() {
       const g = new THREE.Group();
-      const gray = 0x6b7280;
-      const white = 0xf8fafc;
-      const dark = 0x1c1917;
+      const gray = new THREE.MeshStandardMaterial({ color: 0x6b7280, roughness: 0.55 });
+      const white = new THREE.MeshStandardMaterial({ color: 0xf8fafc, roughness: 0.5 });
+      const dark = new THREE.MeshStandardMaterial({ color: 0x1c1917, roughness: 0.4 });
+      const pink = new THREE.MeshStandardMaterial({ color: 0xf4a6b8, roughness: 0.6 });
 
-      // Stocky body (oriented along +Z so forward is +Z)
-      const body = new THREE.Mesh(
-        new THREE.CapsuleGeometry(0.38, 0.7, 6, 10),
-        new THREE.MeshStandardMaterial({ color: gray, roughness: 0.6 })
-      );
-      body.rotation.x = Math.PI / 2;
-      body.position.y = 0.55;
-      body.castShadow = true;
-      g.add(body);
+      // Muscular torso
+      const torso = new THREE.Mesh(new THREE.CapsuleGeometry(0.36, 0.65, 8, 12), gray);
+      torso.rotation.x = Math.PI / 2;
+      torso.position.y = 0.58;
+      torso.castShadow = true;
+      g.add(torso);
 
-      // White chest
-      const chest = new THREE.Mesh(new THREE.SphereGeometry(0.22, 10, 10), new THREE.MeshStandardMaterial({ color: white }));
-      chest.position.set(0, 0.5, 0.28);
+      // Chest mass
+      const chest = new THREE.Mesh(new THREE.SphereGeometry(0.28, 12, 12), white);
+      chest.position.set(0, 0.52, 0.32);
+      chest.scale.set(1.1, 0.9, 1.2);
       g.add(chest);
 
+      // Neck
+      const neck = new THREE.Mesh(new THREE.CylinderGeometry(0.22, 0.26, 0.28, 10), gray);
+      neck.position.set(0, 0.72, 0.38);
+      neck.rotation.x = 0.3;
+      g.add(neck);
+
       // Broad head
-      const head = new THREE.Mesh(new THREE.SphereGeometry(0.32, 14, 14), new THREE.MeshStandardMaterial({ color: gray }));
-      head.position.set(0, 0.78, 0.55);
-      head.scale.set(1.15, 0.95, 1.1);
+      const head = new THREE.Mesh(new THREE.SphereGeometry(0.3, 16, 16), gray);
+      head.position.set(0, 0.86, 0.58);
+      head.scale.set(1.25, 0.95, 1.05);
       head.castShadow = true;
       g.add(head);
 
       // White blaze
-      const blaze = new THREE.Mesh(new THREE.SphereGeometry(0.14, 8, 8), new THREE.MeshStandardMaterial({ color: white }));
-      blaze.position.set(0, 0.88, 0.72);
+      const blaze = new THREE.Mesh(new THREE.SphereGeometry(0.13, 10, 10), white);
+      blaze.position.set(0, 0.96, 0.78);
+      blaze.scale.set(0.7, 1.1, 0.6);
       g.add(blaze);
 
-      // Short muzzle
-      const muzzle = new THREE.Mesh(new THREE.SphereGeometry(0.14, 8, 8), new THREE.MeshStandardMaterial({ color: white }));
-      muzzle.position.set(0, 0.68, 0.82);
-      muzzle.scale.set(1.1, 0.8, 1.2);
+      // Short powerful muzzle
+      const muzzle = new THREE.Mesh(new THREE.SphereGeometry(0.15, 12, 12), white);
+      muzzle.position.set(0, 0.74, 0.88);
+      muzzle.scale.set(1.2, 0.75, 1.3);
       g.add(muzzle);
 
-      const nose = new THREE.Mesh(new THREE.SphereGeometry(0.05, 6, 6), new THREE.MeshStandardMaterial({ color: dark }));
-      nose.position.set(0, 0.72, 0.95);
+      // Nose
+      const nose = new THREE.Mesh(new THREE.SphereGeometry(0.055, 8, 8), dark);
+      nose.position.set(0, 0.78, 1.02);
       g.add(nose);
 
       // Eyes
-      const eyeMat = new THREE.MeshStandardMaterial({ color: 0x3f2a1d });
-      [-0.12, 0.12].forEach(x => {
-        const eye = new THREE.Mesh(new THREE.SphereGeometry(0.045, 6, 6), eyeMat);
-        eye.position.set(x, 0.82, 0.78);
-        g.add(eye);
+      const eyeWhite = new THREE.MeshStandardMaterial({ color: 0xf5f5f4 });
+      const pupil = new THREE.MeshStandardMaterial({ color: 0x3f2a1d });
+      [-0.13, 0.13].forEach(x => {
+        const e = new THREE.Mesh(new THREE.SphereGeometry(0.048, 8, 8), eyeWhite);
+        e.position.set(x, 0.88, 0.82);
+        g.add(e);
+        const p = new THREE.Mesh(new THREE.SphereGeometry(0.028, 6, 6), pupil);
+        p.position.set(x, 0.88, 0.86);
+        g.add(p);
       });
 
       // Floppy ears
-      const earMat = new THREE.MeshStandardMaterial({ color: 0x57534e });
-      [-0.22, 0.22].forEach(x => {
-        const ear = new THREE.Mesh(new THREE.SphereGeometry(0.12, 6, 6), earMat);
-        ear.scale.set(0.55, 1.4, 0.4);
-        ear.position.set(x, 0.95, 0.42);
+      const earMat = new THREE.MeshStandardMaterial({ color: 0x57534e, roughness: 0.7 });
+      [-0.26, 0.26].forEach(x => {
+        const ear = new THREE.Mesh(new THREE.CapsuleGeometry(0.07, 0.22, 4, 6), earMat);
+        ear.scale.set(0.7, 1.6, 0.45);
+        ear.position.set(x, 1.02, 0.48);
+        ear.rotation.z = x > 0 ? -0.4 : 0.4;
+        ear.rotation.x = 0.2;
         g.add(ear);
       });
 
       // Blue collar
-      const collar = new THREE.Mesh(new THREE.TorusGeometry(0.2, 0.035, 6, 12), new THREE.MeshStandardMaterial({ color: 0x2563eb }));
+      const collar = new THREE.Mesh(new THREE.TorusGeometry(0.21, 0.038, 8, 16), new THREE.MeshStandardMaterial({ color: 0x2563eb }));
       collar.rotation.x = Math.PI / 2;
-      collar.position.set(0, 0.62, 0.35);
+      collar.position.set(0, 0.68, 0.4);
       g.add(collar);
 
-      // Short tail
-      const tail = new THREE.Mesh(new THREE.CapsuleGeometry(0.06, 0.28, 4, 6), new THREE.MeshStandardMaterial({ color: gray }));
-      tail.position.set(0, 0.7, -0.5);
-      tail.rotation.x = 0.6;
+      // Short thick tail
+      const tail = new THREE.Mesh(new THREE.CapsuleGeometry(0.07, 0.32, 4, 6), gray);
+      tail.position.set(0, 0.72, -0.52);
+      tail.rotation.x = 0.5;
       g.add(tail);
       g.userData.tail = tail;
 
-      // Short sturdy legs with white paws (order: FL, FR, BL, BR)
+      // Hierarchical legs: upper + lower + paw
       const legs = [];
-      [[0.22, 0.28], [-0.22, 0.28], [0.2, -0.28], [-0.2, -0.28]].forEach(([x, z]) => {
+      const legPositions = [[0.24, 0.32], [-0.24, 0.32], [0.22, -0.3], [-0.22, -0.3]];
+      legPositions.forEach(([x, z]) => {
         const leg = new THREE.Group();
-        const upper = new THREE.Mesh(new THREE.CapsuleGeometry(0.08, 0.22, 4, 6), new THREE.MeshStandardMaterial({ color: gray }));
-        upper.position.y = 0.12;
+        const upper = new THREE.Mesh(new THREE.CapsuleGeometry(0.085, 0.2, 4, 6), gray);
+        upper.position.y = 0.14;
         leg.add(upper);
-        const paw = new THREE.Mesh(new THREE.SphereGeometry(0.09, 6, 6), new THREE.MeshStandardMaterial({ color: white }));
-        paw.position.y = -0.04;
-        paw.scale.set(1, 0.55, 1.15);
+        const lower = new THREE.Mesh(new THREE.CapsuleGeometry(0.07, 0.16, 4, 6), gray);
+        lower.position.y = -0.08;
+        leg.add(lower);
+        const paw = new THREE.Mesh(new THREE.SphereGeometry(0.095, 8, 8), white);
+        paw.position.y = -0.22;
+        paw.scale.set(1.05, 0.5, 1.2);
         leg.add(paw);
-        leg.position.set(x, 0.28, z);
+        leg.position.set(x, 0.32, z);
         g.add(leg);
         legs.push(leg);
       });
       g.userData.legs = legs;
-      g.userData.body = body;
+      g.userData.body = torso;
+      g.userData.head = head;
       return g;
+    }
     }
 
     const dog = createDog();
