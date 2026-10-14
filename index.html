@@ -123,6 +123,20 @@
       trees.push(makeTree(i+(Math.random()-0.5)*1.5, -7-Math.random()*5, 0.6+Math.random()*0.5));
       trees.push(makeTree(i+2.5, -16-Math.random()*6, 0.4+Math.random()*0.35));
     }
+
+    // House they walk into
+    const house = new THREE.Group();
+    const hBody = new THREE.Mesh(new THREE.BoxGeometry(4.5, 3.2, 3), new THREE.MeshStandardMaterial({ color: 0xc4a882 }));
+    hBody.position.y = 1.6;
+    house.add(hBody);
+    const roof = new THREE.Mesh(new THREE.ConeGeometry(3.4, 1.3, 4), new THREE.MeshStandardMaterial({ color: 0x8b4513 }));
+    roof.position.y = 3.4; roof.rotation.y = Math.PI/4;
+    house.add(roof);
+    const door = new THREE.Mesh(new THREE.BoxGeometry(1.2, 2, 0.15), new THREE.MeshStandardMaterial({ color: 0x5c4033 }));
+    door.position.set(0, 1, 1.55);
+    house.add(door);
+    house.position.set(28, 0, 0);
+    outdoor.add(house);
     scene.add(outdoor);
 
     // Interior
@@ -237,13 +251,14 @@
     }
 
     // Beats (seconds)
-    const B = { approachEnd: 90, meetEnd: 133, sitEnd: 142, forestEnd: 210, interiorEnd: 248 };
+    const B = { approachEnd: 90, meetEnd: 133, sitEnd: 142, forestEnd: 195, enterEnd: 215, interiorEnd: 248 };
 
     function getPhase(time) {
       if (time < B.approachEnd) return 'approach';
       if (time < B.meetEnd) return 'close';
       if (time < B.sitEnd) return 'sit';
       if (time < B.forestEnd) return 'forest';
+      if (time < B.enterEnd) return 'enter';
       return 'interior';
     }
 
@@ -342,15 +357,35 @@
         // Camera behind
         camPos.set(gx - 6, 3.2, 0.3);
         camTarget.set(gx + 3, 1.0, 0);
+      } else if (phase === 'enter') {
+        // Walk seamlessly into the house
+        const e = Math.min((time - B.forestEnd) / (B.enterEnd - B.forestEnd), 1);
+        const doorX = 28;
+        dog.position.set(THREE.MathUtils.lerp(26, doorX - 0.3, e), Math.abs(Math.sin(t*4))*0.01, 0);
+        dog.rotation.y = Math.PI/2; dog.rotation.z = 0;
+        walk(dog.userData.legs, null, t, 1.2, 0.3);
+        family.forEach((p, i) => {
+          const targetX = doorX - 0.5 - i * 0.3;
+          p.position.set(THREE.MathUtils.lerp(27 + i*0.4, targetX, e), Math.abs(Math.sin(t*3.5+i))*0.01, THREE.MathUtils.lerp(zOff[i]*0.5, 0, e));
+          p.rotation.y = Math.PI/2;
+          walk(p.userData.legs, p.userData.arms, t+i, 1.1, 0.28, 0.18);
+          if (e > 0.75) p.visible = false;
+        });
+        if (e > 0.8) dog.visible = false;
+        door.rotation.y = e * 0.9;
+        camPos.set(22, 2.8, 4);
+        camTarget.set(doorX, 1.2, 0);
       } else {
         // Interior
         fireLight.intensity = 3.2 + Math.sin(t*7)*0.7;
         const fp = fire.geometry.attributes.position.array;
         for (let i = 0; i < fireCount; i++) { fp[i*3+1] += 0.025; if (fp[i*3+1] > 1.3) fp[i*3+1] = 0.05; }
         fire.geometry.attributes.position.needsUpdate = true;
+        dog.visible = true;
         dog.position.set(0, 0.08, -0.9);
         dog.rotation.y = 0; dog.rotation.z = 0.25;
         family.forEach((p, i) => {
+          p.visible = true;
           const side = i < 2 ? -1 : 1;
           p.position.set(side*(1.1+(i%2)*0.6), 0.12, -0.4+(i%2)*0.3);
           p.rotation.y = Math.PI; p.rotation.z = side*0.35;
