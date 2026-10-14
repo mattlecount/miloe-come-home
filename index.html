@@ -39,6 +39,18 @@
     }
     #fullscreen-btn:hover { background: rgba(0,0,0,0.7); }
 
+    #scrubber {
+      position: absolute; bottom: 1.2rem; left: 50%; transform: translateX(-50%);
+      z-index: 15; display: flex; align-items: center; gap: 0.75rem;
+      background: rgba(0,0,0,0.55); padding: 0.5rem 1rem; border-radius: 8px;
+      backdrop-filter: blur(4px); min-width: 280px; max-width: 80vw;
+    }
+    #scrubber input[type=range] {
+      flex: 1; height: 4px; accent-color: #f5e6d3; cursor: pointer;
+    }
+    #scrubber span { font-size: 0.8rem; opacity: 0.85; min-width: 42px; text-align: center; font-variant-numeric: tabular-nums; }
+
+
   </style>
 </head>
 <body>
@@ -50,6 +62,11 @@
     <p>This experience works best in landscape</p>
   </div>
   <button id="fullscreen-btn">Fullscreen</button>
+  <div id="scrubber">
+    <span id="time-current">0:00</span>
+    <input type="range" id="timeline" min="0" max="100" value="0" step="0.1">
+    <span id="time-total">0:00</span>
+  </div>
 
   <div id="start-screen">
     <h1>Miloe, Come Home</h1>
@@ -564,6 +581,37 @@
     document.addEventListener('webkitfullscreenchange', () => {
       fsBtn.textContent = isFs() ? 'Exit' : 'Fullscreen';
     });
+
+
+    // Timeline scrubber
+    const timeline = document.getElementById('timeline');
+    const timeCurrent = document.getElementById('time-current');
+    const timeTotal = document.getElementById('time-total');
+    let scrubbing = false;
+
+    function fmt(s) {
+      if (!s || isNaN(s)) return '0:00';
+      const m = Math.floor(s / 60);
+      const sec = Math.floor(s % 60);
+      return m + ':' + (sec < 10 ? '0' : '') + sec;
+    }
+    audio.addEventListener('loadedmetadata', () => {
+      timeline.max = audio.duration;
+      timeTotal.textContent = fmt(audio.duration);
+    });
+    timeline.addEventListener('pointerdown', () => { scrubbing = true; });
+    timeline.addEventListener('pointerup', () => { scrubbing = false; });
+    timeline.addEventListener('input', () => {
+      const t = parseFloat(timeline.value);
+      audio.currentTime = t;
+      timeCurrent.textContent = fmt(t);
+    });
+    setInterval(() => {
+      if (!scrubbing && audio.duration) {
+        timeline.value = audio.currentTime;
+        timeCurrent.textContent = fmt(audio.currentTime);
+      }
+    }, 200);
 
     window.addEventListener('resize', () => {
       camera.aspect = window.innerWidth / window.innerHeight;
