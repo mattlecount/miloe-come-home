@@ -6,7 +6,7 @@
   <title>Miloe, Come Home</title>
   <style>
     * { margin: 0; padding: 0; box-sizing: border-box; }
-    body { overflow: hidden; background: #0a0a0a; font-family: system-ui, sans-serif; color: #f5e6d3; }
+    body { overflow: hidden; background: #000; font-family: system-ui, sans-serif; color: #f5e6d3; }
     #canvas { display: block; width: 100vw; height: 100vh; }
     #start-screen {
       position: absolute; inset: 0; background: rgba(10,10,10,0.88);
@@ -32,12 +32,15 @@
   <script type="module">
     import * as THREE from 'three';
 
+    const BPM = 116;
+    const beat = 60 / BPM;
+
     const canvas = document.getElementById('canvas');
     const startScreen = document.getElementById('start-screen');
 
     const scene = new THREE.Scene();
-    scene.fog = new THREE.Fog(0x87a0b0, 25, 90);
-    scene.background = new THREE.Color(0x87a0b0);
+    scene.fog = new THREE.Fog(0x1a2030, 20, 100);
+    scene.background = new THREE.Color(0x1a2030);
 
     const camera = new THREE.PerspectiveCamera(42, window.innerWidth / window.innerHeight, 0.1, 400);
     camera.position.set(0, 5, 26);
@@ -47,70 +50,131 @@
     renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
     renderer.shadowMap.enabled = true;
 
-    const ambient = new THREE.AmbientLight(0xffffff, 0.65);
+    const ambient = new THREE.AmbientLight(0xffffff, 0.5);
     scene.add(ambient);
-    const sun = new THREE.DirectionalLight(0xfff5e0, 1.1);
+    const sun = new THREE.DirectionalLight(0xfff5e0, 1.0);
     sun.position.set(10, 18, 8);
     sun.castShadow = true;
     scene.add(sun);
 
-    // Sky dome
-    const skyGeo = new THREE.SphereGeometry(180, 32, 16);
-    const skyMat = new THREE.MeshBasicMaterial({ color: 0x87a0b0, side: THREE.BackSide });
+    // Animated gradient sky (two layers)
+    const skyGeo = new THREE.SphereGeometry(200, 32, 16);
+    const skyMat = new THREE.ShaderMaterial({
+      side: THREE.BackSide,
+      uniforms: {
+        time: { value: 0 },
+        progress: { value: 0 },
+        bass: { value: 0 },
+        night: { value: 0 }
+      },
+      vertexShader: `
+        varying vec3 vPos;
+        void main() {
+          vPos = position;
+          gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+        }
+      `,
+      fragmentShader: `
+        uniform float time;
+        uniform float progress;
+        uniform float bass;
+        uniform float night;
+        varying vec3 vPos;
+        void main() {
+          float h = normalize(vPos).y;
+          vec3 dawn = mix(vec3(0.15,0.2,0.4), vec3(0.9,0.5,0.3), smoothstep(-0.2,0.4,h));
+          vec3 day = mix(vec3(0.3,0.55,0.9), vec3(0.6,0.8,1.0), smoothstep(-0.1,0.6,h));
+          vec3 dusk = mix(vec3(0.2,0.1,0.3), vec3(0.9,0.4,0.2), smoothstep(-0.2,0.5,h));
+          vec3 nightCol = mix(vec3(0.02,0.02,0.08), vec3(0.05,0.08,0.2), smoothstep(-0.3,0.5,h));
+          vec3 base = mix(dawn, day, smoothstep(0.0,0.35,progress));
+          base = mix(base, dusk, smoothstep(0.45,0.7,progress));
+          base = mix(base, nightCol, night);
+          float pulse = sin(time * 2.0 + h * 4.0) * 0.08 * bass;
+          base += pulse;
+          gl_FragColor = vec4(base, 1.0);
+        }
+      `
+    });
     const sky = new THREE.Mesh(skyGeo, skyMat);
     scene.add(sky);
 
-    // Weather particles
-    const weatherCount = 600;
+    // Fireworks
+    const fireworks = [];
+    function spawnFirework(x, y, z, color) {
+      const count = 40;
+      const geo = new THREE.BufferGeometry();
+      const pos = new Float32Array(count * 3);
+      const vel = [];
+      for (let i = 0; i < count; i++) {
+        pos[i*3] = x; pos[i*3+1] = y; pos[i*3+2] = z;
+        const theta = Math.random()*Math.PI*2;
+        const phi = Math.random()*Math.PI;
+        const speed = 4 + Math.random()*6;
+        vel.push(new THREE.Vector3(Math.sin(phi)*Math.cos(theta)*speed, Math.cos(phi)*speed, Math.sin(phi)*Math.sin(theta)*speed));
+      }
+      geo.setAttribute('position', new THREE.BufferAttribute(pos, 3));
+      const mat = new THREE.PointsMaterial({ size: 0.25, color, transparent: true, opacity: 1 });
+      const pts = new THREE.Points(geo, mat);
+      scene.add(pts);
+      fireworks.push({ pts, vel, life: 1.2 });
+    }
+
+    // Weather
+    const weatherCount = 400;
     const weatherPos = new Float32Array(weatherCount * 3);
-    const weatherVel = new Float32Array(weatherCount);
     for (let i = 0; i < weatherCount; i++) {
-      weatherPos[i*3] = (Math.random()-0.5)*70;
-      weatherPos[i*3+1] = Math.random()*25;
+      weatherPos[i*3] = (Math.random()-0.5)*80;
+      weatherPos[i*3+1] = Math.random()*30;
       weatherPos[i*3+2] = (Math.random()-0.5)*30;
-      weatherVel[i] = 0.05 + Math.random()*0.15;
     }
     const weatherGeo = new THREE.BufferGeometry();
     weatherGeo.setAttribute('position', new THREE.BufferAttribute(weatherPos, 3));
-    const weatherMat = new THREE.PointsMaterial({ size: 0.08, color: 0xffffff, transparent: true, opacity: 0 });
-    const weather = new THREE.Points(weatherGeo, weatherMat);
+    const weather = new THREE.Points(weatherGeo, new THREE.PointsMaterial({ size: 0.07, color: 0xffffff, transparent: true, opacity: 0 }));
     scene.add(weather);
 
     // Ground
     const ground = new THREE.Mesh(
-      new THREE.PlaneGeometry(90, 24),
-      new THREE.MeshStandardMaterial({ color: 0x5a6a4a, roughness: 0.9 })
+      new THREE.PlaneGeometry(100, 28),
+      new THREE.MeshStandardMaterial({ color: 0x4a6a4a, roughness: 0.9 })
     );
     ground.rotation.x = -Math.PI / 2;
     ground.receiveShadow = true;
     scene.add(ground);
 
-    // Trees
-    function makeTree(x, seasonColor) {
+    // Trees that sway
+    function makeTree(x) {
       const g = new THREE.Group();
-      const trunk = new THREE.Mesh(new THREE.CylinderGeometry(0.14, 0.2, 1.5, 6), new THREE.MeshStandardMaterial({ color: 0x5c4033 }));
-      trunk.position.y = 0.75;
+      const trunk = new THREE.Mesh(new THREE.CylinderGeometry(0.15, 0.22, 1.6, 6), new THREE.MeshStandardMaterial({ color: 0x5c4033 }));
+      trunk.position.y = 0.8;
       g.add(trunk);
-      const leaves = new THREE.Mesh(new THREE.ConeGeometry(0.85, 1.7, 7), new THREE.MeshStandardMaterial({ color: seasonColor }));
-      leaves.position.y = 2.0;
+      const leaves = new THREE.Mesh(new THREE.ConeGeometry(0.9, 1.8, 7), new THREE.MeshStandardMaterial({ color: 0x2d6a2d }));
+      leaves.position.y = 2.1;
       g.add(leaves);
-      g.position.set(x, 0, -4);
+      g.position.set(x, 0, -5);
       g.userData.leaves = leaves;
+      g.userData.phase = Math.random() * Math.PI * 2;
       scene.add(g);
       return g;
     }
     const trees = [];
-    for (let i = -36; i <= 36; i += 5.5) trees.push(makeTree(i + (Math.random()-0.5)*1.5, 0x2d5a27));
+    for (let i = -40; i <= 40; i += 5) trees.push(makeTree(i + (Math.random()-0.5)*1.2));
 
-    // House for end
+    // House (appears only at end)
     const house = new THREE.Group();
-    const hBody = new THREE.Mesh(new THREE.BoxGeometry(4.2, 3.2, 3), new THREE.MeshStandardMaterial({ color: 0xc4a882 }));
-    hBody.position.y = 1.6;
+    const hBody = new THREE.Mesh(new THREE.BoxGeometry(4.5, 3.4, 3.2), new THREE.MeshStandardMaterial({ color: 0xc4a882 }));
+    hBody.position.y = 1.7;
     house.add(hBody);
-    const door = new THREE.Mesh(new THREE.BoxGeometry(1.1, 1.9, 0.15), new THREE.MeshStandardMaterial({ color: 0x5c4033 }));
-    door.position.set(0, 0.95, 1.55);
+    const roof = new THREE.Mesh(new THREE.ConeGeometry(3.2, 1.4, 4), new THREE.MeshStandardMaterial({ color: 0x8b4513 }));
+    roof.position.y = 3.6;
+    roof.rotation.y = Math.PI/4;
+    house.add(roof);
+    const door = new THREE.Mesh(new THREE.BoxGeometry(1.2, 2.0, 0.15), new THREE.MeshStandardMaterial({ color: 0x5c4033 }));
+    door.position.set(0, 1.0, 1.65);
     house.add(door);
-    house.position.set(0, 0, -2);
+    const windowLight = new THREE.PointLight(0xffcc88, 0, 8);
+    windowLight.position.set(0, 2.2, 1.2);
+    house.add(windowLight);
+    house.position.set(8, 0, -1);
     house.visible = false;
     scene.add(house);
 
@@ -120,43 +184,34 @@
       const gray = new THREE.MeshStandardMaterial({ color: 0x6b7280, roughness: 0.55 });
       const white = new THREE.MeshStandardMaterial({ color: 0xf8fafc, roughness: 0.5 });
       const dark = new THREE.MeshStandardMaterial({ color: 0x1c1917 });
-
       const torso = new THREE.Mesh(new THREE.CapsuleGeometry(0.36, 0.65, 8, 12), gray);
       torso.rotation.x = Math.PI / 2;
       torso.position.y = 0.58;
       torso.castShadow = true;
       g.add(torso);
-
       const chest = new THREE.Mesh(new THREE.SphereGeometry(0.28, 12, 12), white);
       chest.position.set(0, 0.52, 0.32);
-      chest.scale.set(1.1, 0.9, 1.2);
       g.add(chest);
-
       const head = new THREE.Mesh(new THREE.SphereGeometry(0.3, 16, 16), gray);
       head.position.set(0, 0.86, 0.58);
       head.scale.set(1.25, 0.95, 1.05);
       head.castShadow = true;
       g.add(head);
-
       const blaze = new THREE.Mesh(new THREE.SphereGeometry(0.13, 10, 10), white);
       blaze.position.set(0, 0.96, 0.78);
       g.add(blaze);
-
       const muzzle = new THREE.Mesh(new THREE.SphereGeometry(0.15, 12, 12), white);
       muzzle.position.set(0, 0.74, 0.88);
       muzzle.scale.set(1.2, 0.75, 1.3);
       g.add(muzzle);
-
       const nose = new THREE.Mesh(new THREE.SphereGeometry(0.055, 8, 8), dark);
       nose.position.set(0, 0.78, 1.02);
       g.add(nose);
-
       [-0.13, 0.13].forEach(x => {
         const e = new THREE.Mesh(new THREE.SphereGeometry(0.045, 8, 8), new THREE.MeshStandardMaterial({ color: 0xf5f5f4 }));
         e.position.set(x, 0.88, 0.82);
         g.add(e);
       });
-
       const earMat = new THREE.MeshStandardMaterial({ color: 0x57534e });
       [-0.26, 0.26].forEach(x => {
         const ear = new THREE.Mesh(new THREE.CapsuleGeometry(0.07, 0.22, 4, 6), earMat);
@@ -165,18 +220,15 @@
         ear.rotation.z = x > 0 ? -0.4 : 0.4;
         g.add(ear);
       });
-
       const collar = new THREE.Mesh(new THREE.TorusGeometry(0.21, 0.038, 8, 16), new THREE.MeshStandardMaterial({ color: 0x2563eb }));
       collar.rotation.x = Math.PI / 2;
       collar.position.set(0, 0.68, 0.4);
       g.add(collar);
-
       const tail = new THREE.Mesh(new THREE.CapsuleGeometry(0.07, 0.32, 4, 6), gray);
       tail.position.set(0, 0.72, -0.52);
       tail.rotation.x = 0.5;
       g.add(tail);
       g.userData.tail = tail;
-
       const legs = [];
       [[0.24, 0.32], [-0.24, 0.32], [0.22, -0.3], [-0.22, -0.3]].forEach(([x, z]) => {
         const leg = new THREE.Group();
@@ -192,16 +244,13 @@
         legs.push(leg);
       });
       g.userData.legs = legs;
-      g.userData.body = torso;
       return g;
     }
-
     const dog = createDog();
-    dog.position.set(-32, 0, 0);
+    dog.position.set(-34, 0, 0);
     dog.rotation.y = Math.PI / 2;
     scene.add(dog);
 
-    // Family walking side by side
     function createPerson(scale, hairColor, shirtColor) {
       const g = new THREE.Group();
       g.scale.setScalar(scale);
@@ -235,7 +284,6 @@
       g.userData.legs = legs;
       return g;
     }
-
     const familyData = [
       { scale: 1.15, hair: 0x3f3f46, shirt: 0x1e40af },
       { scale: 1.0, hair: 0x5c4033, shirt: 0x7c3aed },
@@ -243,25 +291,22 @@
       { scale: 0.65, hair: 0xf5d76e, shirt: 0xec4899 }
     ];
     const people = [];
-    // Side by side: different Z, same starting X
-    const zOffsets = [-1.6, -0.5, 0.5, 1.6];
+    const zOffsets = [-1.8, -0.6, 0.6, 1.8];
     familyData.forEach((p, i) => {
       const person = createPerson(p.scale, p.hair, p.shirt);
-      person.position.set(26, 0, zOffsets[i]);
+      person.position.set(28, 0, zOffsets[i]);
       person.rotation.y = -Math.PI / 2;
       scene.add(person);
       people.push(person);
     });
+    dog.scale.setScalar((0.65 * 1.9 * 0.5) / 1.15);
 
-    // Dog half Ava height
-    const avaHeight = 0.65 * 1.9;
-    dog.scale.setScalar((avaHeight * 0.5) / 1.15);
-
-    // Audio
     const audio = new Audio('miloe.m4a');
     let audioCtx, analyser, dataArray, source;
     let started = false;
-    let lying = false;
+    let entering = false;
+    let lightsOut = false;
+    let lastFirework = 0;
 
     function initAudio() {
       audioCtx = new (window.AudioContext || window.webkitAudioContext)();
@@ -296,69 +341,11 @@
       });
     }
 
-    function setSky(progress, bass) {
-      // Seasons / weather over the song
-      let skyColor, groundColor, leafColor, weatherColor, weatherOp, sunInt;
-      if (progress < 0.2) {
-        // Early spring / cool morning
-        skyColor = new THREE.Color(0x7eb8d4);
-        groundColor = new THREE.Color(0x4a7a4a);
-        leafColor = new THREE.Color(0x3a8a3a);
-        weatherOp = 0;
-      } else if (progress < 0.4) {
-        // Summer bright
-        skyColor = new THREE.Color(0x5aa0e0);
-        groundColor = new THREE.Color(0x5a8a4a);
-        leafColor = new THREE.Color(0x2d6a2d);
-        weatherOp = 0.15 * bass; // light dust
-        weatherColor = 0xffffee;
-      } else if (progress < 0.55) {
-        // Rainy moment
-        skyColor = new THREE.Color(0x5a6a78);
-        groundColor = new THREE.Color(0x3a4a3a);
-        leafColor = new THREE.Color(0x2a5a2a);
-        weatherOp = 0.7;
-        weatherColor = 0xaaccff;
-      } else if (progress < 0.75) {
-        // Autumn
-        skyColor = new THREE.Color(0xd4a070);
-        groundColor = new THREE.Color(0x6a5a3a);
-        leafColor = new THREE.Color(0xc45a2a);
-        weatherOp = 0.4;
-        weatherColor = 0xffaa55;
-      } else {
-        // Soft evening / winter light for the lie-down
-        skyColor = new THREE.Color(0x6a5a88);
-        groundColor = new THREE.Color(0x4a4a5a);
-        leafColor = new THREE.Color(0x3a3a4a);
-        weatherOp = 0.25;
-        weatherColor = 0xeeeeff;
-      }
-
-      // Big chorus moments: warm flash
-      if ((progress > 0.35 && progress < 0.42) || (progress > 0.6 && progress < 0.68)) {
-        skyColor.lerp(new THREE.Color(0xffcc88), 0.6 + bass * 0.3);
-        sunInt = 1.8 + bass * 1.2;
-      } else {
-        sunInt = 1.0;
-      }
-
-      skyMat.color.copy(skyColor);
-      scene.background.copy(skyColor);
-      scene.fog.color.copy(skyColor);
-      ground.material.color.copy(groundColor);
-      trees.forEach(tr => { if (tr.userData.leaves) tr.userData.leaves.material.color.copy(leafColor); });
-      if (weatherColor) weatherMat.color.set(weatherColor);
-      weatherMat.opacity = weatherOp;
-      sun.intensity = sunInt + bass * 0.3;
-      ambient.intensity = 0.5 + (1 - progress) * 0.2;
-    }
-
     function animate() {
       requestAnimationFrame(animate);
       const t = clock.getElapsedTime();
       const time = audio.currentTime || 0;
-      const duration = audio.duration || 248;
+      const duration = audio.duration || 247.6;
       const progress = Math.min(time / duration, 1);
 
       let bass = 0;
@@ -367,30 +354,60 @@
         bass = dataArray.slice(0, 10).reduce((a,b)=>a+b,0) / 10 / 255;
       }
 
-      setSky(progress, bass);
+      // Sky
+      skyMat.uniforms.time.value = t;
+      skyMat.uniforms.progress.value = progress;
+      skyMat.uniforms.bass.value = bass;
+      const nightAmount = Math.max(0, (progress - 0.78) / 0.22);
+      skyMat.uniforms.night.value = nightAmount;
 
-      // Weather particles fall
+      // Trees sway to BPM
+      const sway = Math.sin(t * (Math.PI * 2) / beat) * 0.08 * (0.5 + bass);
+      trees.forEach(tr => {
+        tr.rotation.z = sway * Math.sin(tr.userData.phase + t * 0.5);
+      });
+
+      // Fireworks on expressive moments (choruses ~0.38, 0.62, 0.85)
+      const bigMoments = [0.36, 0.38, 0.40, 0.60, 0.63, 0.66, 0.82, 0.85];
+      if (bigMoments.some(m => Math.abs(progress - m) < 0.008) && t - lastFirework > 0.4) {
+        lastFirework = t;
+        spawnFirework((Math.random()-0.5)*20, 12 + Math.random()*6, -8, new THREE.Color().setHSL(Math.random(), 0.8, 0.6));
+      }
+
+      // Update fireworks
+      for (let i = fireworks.length - 1; i >= 0; i--) {
+        const fw = fireworks[i];
+        fw.life -= 0.016;
+        const pos = fw.pts.geometry.attributes.position.array;
+        for (let j = 0; j < fw.vel.length; j++) {
+          pos[j*3] += fw.vel[j].x * 0.016;
+          pos[j*3+1] += fw.vel[j].y * 0.016;
+          pos[j*3+2] += fw.vel[j].z * 0.016;
+          fw.vel[j].y -= 4 * 0.016;
+        }
+        fw.pts.geometry.attributes.position.needsUpdate = true;
+        fw.pts.material.opacity = Math.max(0, fw.life);
+        if (fw.life <= 0) {
+          scene.remove(fw.pts);
+          fireworks.splice(i, 1);
+        }
+      }
+
+      // Weather
+      weather.material.opacity = progress > 0.45 && progress < 0.65 ? 0.5 : (progress > 0.7 ? 0.2 : 0);
       const wp = weather.geometry.attributes.position.array;
       for (let i = 0; i < weatherCount; i++) {
-        wp[i*3+1] -= weatherVel[i] * (weatherMat.opacity > 0.3 ? 1.5 : 0.3);
-        if (wp[i*3+1] < 0) wp[i*3+1] = 22;
+        wp[i*3+1] -= 0.12;
+        if (wp[i*3+1] < 0) wp[i*3+1] = 25;
       }
       weather.geometry.attributes.position.needsUpdate = true;
 
-      // Walk toward each other
-      const dogStart = -32;
-      const familyStart = 26;
-      const meetProgress = Math.min(progress * 1.25, 1);
-      const dogX = dogStart + (0 - dogStart) * meetProgress;
-      const familyX = familyStart + (0 - familyStart) * meetProgress;
+      // Movement
+      const meetProgress = Math.min(progress * 1.15, 0.82);
+      const dogX = -34 + (4 - (-34)) * meetProgress;
+      const familyX = 28 + (4 - 28) * meetProgress;
 
-      const closeEnough = Math.abs(dogX - familyX) < 4.5;
-
-      if (!lying && closeEnough && progress > 0.55) {
-        lying = true;
-      }
-
-      if (!lying) {
+      if (progress < 0.82) {
         dog.position.x = dogX;
         dog.position.y = Math.abs(Math.sin(t * 5)) * 0.02;
         dog.rotation.y = Math.PI / 2;
@@ -402,42 +419,47 @@
           person.position.z = zOffsets[i];
           person.position.y = Math.abs(Math.sin(t * 4.2 + i)) * 0.015;
           person.rotation.y = -Math.PI / 2;
-          person.rotation.z = 0;
           animateWalk(person.userData.legs, person.userData.arms, t + i * 0.3, 1.3, 0.38, 0.28);
         });
       } else {
-        // Lie down together, dog in middle
-        const lieT = Math.min((time - (duration * 0.55)) / 8, 1);
-        dog.position.x = THREE.MathUtils.lerp(dog.position.x, 0, 0.04);
-        dog.position.y = THREE.MathUtils.lerp(dog.position.y, 0.15, 0.05);
-        dog.rotation.z = THREE.MathUtils.lerp(dog.rotation.z, Math.PI / 2, 0.06);
-        dog.rotation.y = THREE.MathUtils.lerp(dog.rotation.y, 0, 0.04);
-
-        people.forEach((person, i) => {
-          const side = i < 2 ? -1 : 1;
-          const depth = (i % 2) * 0.8 - 0.4;
-          person.position.x = THREE.MathUtils.lerp(person.position.x, side * (1.4 + (i%2)*0.6), 0.04);
-          person.position.z = THREE.MathUtils.lerp(person.position.z, depth, 0.04);
-          person.position.y = THREE.MathUtils.lerp(person.position.y, 0.25, 0.05);
-          person.rotation.z = THREE.MathUtils.lerp(person.rotation.z, side * Math.PI / 2, 0.06);
-          person.rotation.y = THREE.MathUtils.lerp(person.rotation.y, 0, 0.04);
-        });
+        // End: house appears, night, they walk in
         house.visible = true;
-        house.position.x = 6;
+        windowLight.intensity = lightsOut ? 0 : 2.5;
+        const enter = Math.min((progress - 0.82) / 0.15, 1);
+        const targetX = house.position.x - 0.5;
+        dog.position.x = THREE.MathUtils.lerp(dog.position.x, targetX, 0.03);
+        dog.rotation.y = Math.PI / 2;
+        animateWalk(dog.userData.legs, null, t, 1.2, 0.3);
+        people.forEach((person, i) => {
+          person.position.x = THREE.MathUtils.lerp(person.position.x, targetX - 0.8 - i * 0.4, 0.025);
+          person.position.z = THREE.MathUtils.lerp(person.position.z, zOffsets[i] * 0.4, 0.02);
+          person.rotation.y = Math.PI / 2;
+          animateWalk(person.userData.legs, person.userData.arms, t + i, 1.1, 0.25, 0.2);
+        });
+        door.rotation.y = enter * 0.9;
+        if (progress > 0.97) lightsOut = true;
       }
 
-      // Camera framing
-      const allX = [dog.position.x, ...people.map(p => p.position.x)];
+      // Camera
+      const allX = [dog.position.x, ...people.map(p => p.position.x), house.visible ? house.position.x : 0];
       const minX = Math.min(...allX) - 3;
       const maxX = Math.max(...allX) + 3;
       const centerX = (minX + maxX) / 2;
-      const span = Math.max(maxX - minX, 8);
-      const zoom = lying ? 1.6 : 1 + progress * 1.4;
-      const desiredZ = Math.max(10, span * 0.7 / zoom);
-      camera.position.x = THREE.MathUtils.lerp(camera.position.x, centerX, 0.025);
-      camera.position.z = THREE.MathUtils.lerp(camera.position.z, desiredZ, 0.02);
-      camera.position.y = THREE.MathUtils.lerp(camera.position.y, lying ? 2.8 : 3.5 + (1-progress)*1.2, 0.02);
-      camera.lookAt(centerX, 0.8, 0);
+      const span = Math.max(maxX - minX, 10);
+      const zoom = 1 + progress * 1.2;
+      const desiredZ = Math.max(12, span * 0.65 / zoom);
+      camera.position.x = THREE.MathUtils.lerp(camera.position.x, centerX, 0.02);
+      camera.position.z = THREE.MathUtils.lerp(camera.position.z, desiredZ, 0.015);
+      camera.position.y = THREE.MathUtils.lerp(camera.position.y, nightAmount > 0.5 ? 3.5 : 4.2, 0.02);
+      camera.lookAt(centerX, 1.0, 0);
+
+      if (lightsOut) {
+        ambient.intensity = THREE.MathUtils.lerp(ambient.intensity, 0.05, 0.02);
+        sun.intensity = THREE.MathUtils.lerp(sun.intensity, 0, 0.02);
+      } else {
+        ambient.intensity = 0.45 + (1 - nightAmount) * 0.2;
+        sun.intensity = (1 - nightAmount) * (1.0 + bass * 0.4);
+      }
 
       renderer.render(scene, camera);
     }
