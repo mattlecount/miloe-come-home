@@ -2,12 +2,19 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, maximum-scale=1">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <title>Miloe, Come Home</title>
   <style>
     * { margin: 0; padding: 0; box-sizing: border-box; }
-    body { overflow: hidden; background: #000; font-family: system-ui, sans-serif; color: #f5e6d3; }
-    #canvas { display: block; width: 100vw; height: 100vh; }
+    body { 
+      overflow: hidden; background: #000; font-family: system-ui, sans-serif; color: #f5e6d3;
+      margin: 0; height: 100dvh; height: -webkit-fill-available;
+      position: fixed; width: 100%;
+    }
+    html { height: 100dvh; height: -webkit-fill-available; }
+    #canvas { display: block; width: 100%; height: 100%; position: fixed; inset: 0; }
     #start-screen {
       position: absolute; inset: 0; background: rgba(10,10,10,0.88);
       display: flex; flex-direction: column; align-items: center; justify-content: center;
@@ -494,8 +501,29 @@
     const rotatePrompt = document.getElementById('rotate-prompt');
     const fsBtn = document.getElementById('fullscreen-btn');
 
+    function isIOS() {
+      return /iPad|iPhone|iPod/.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+    }
     function isMobile() {
       return /Android|iPhone|iPad|iPod|Mobile/i.test(navigator.userAgent) || window.innerWidth < 900;
+    }
+    function requestFs() {
+      const el = document.documentElement;
+      const fn = el.requestFullscreen || el.webkitRequestFullscreen || el.webkitRequestFullScreen || el.mozRequestFullScreen || el.msRequestFullscreen;
+      if (fn) return fn.call(el).catch(() => {});
+      return Promise.resolve();
+    }
+    function exitFs() {
+      const fn = document.exitFullscreen || document.webkitExitFullscreen || document.webkitCancelFullScreen || document.mozCancelFullScreen;
+      if (fn) return fn.call(document);
+    }
+    function isFs() {
+      return !!(document.fullscreenElement || document.webkitFullscreenElement || document.mozFullScreenElement);
+    }
+    function maximizeIOS() {
+      // iOS Safari has no real document fullscreen; maximize viewport and hide chrome as much as possible
+      document.body.style.height = window.innerHeight + 'px';
+      window.scrollTo(0, 1);
     }
     function checkOrientation() {
       const portrait = window.innerHeight > window.innerWidth;
@@ -503,27 +531,38 @@
         rotatePrompt.classList.add('show');
       } else {
         rotatePrompt.classList.remove('show');
-        // Auto fullscreen on landscape for mobile
-        if (isMobile() && !portrait && !document.fullscreenElement) {
-          document.documentElement.requestFullscreen?.().catch(() => {});
+        if (isMobile() && !portrait) {
+          if (isIOS()) {
+            maximizeIOS();
+          } else if (!isFs()) {
+            requestFs();
+          }
         }
       }
     }
     window.addEventListener('resize', checkOrientation);
-    window.addEventListener('orientationchange', () => setTimeout(checkOrientation, 100));
+    window.addEventListener('orientationchange', () => setTimeout(checkOrientation, 150));
     checkOrientation();
 
     fsBtn.addEventListener('click', () => {
-      if (!document.fullscreenElement) {
-        document.documentElement.requestFullscreen?.().catch(() => {});
-        fsBtn.textContent = 'Exit';
+      if (isIOS()) {
+        maximizeIOS();
+        fsBtn.textContent = 'Maximized';
+        setTimeout(() => { fsBtn.textContent = 'Fullscreen'; }, 1500);
+        return;
+      }
+      if (!isFs()) {
+        requestFs().then(() => { fsBtn.textContent = 'Exit'; });
       } else {
-        document.exitFullscreen?.();
+        exitFs();
         fsBtn.textContent = 'Fullscreen';
       }
     });
     document.addEventListener('fullscreenchange', () => {
-      fsBtn.textContent = document.fullscreenElement ? 'Exit' : 'Fullscreen';
+      fsBtn.textContent = isFs() ? 'Exit' : 'Fullscreen';
+    });
+    document.addEventListener('webkitfullscreenchange', () => {
+      fsBtn.textContent = isFs() ? 'Exit' : 'Fullscreen';
     });
 
     window.addEventListener('resize', () => {
