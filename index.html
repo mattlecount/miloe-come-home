@@ -35,6 +35,26 @@
   <script type="importmap">{ "imports": { "three": "https://unpkg.com/three@0.160.0/build/three.module.js" } }</script>
   <script type="module">
     import * as THREE from 'three';
+
+    // Cel-shading gradient map (3 bands)
+    function makeToonGradient() {
+      const c = document.createElement('canvas');
+      c.width = 4; c.height = 1;
+      const ctx = c.getContext('2d');
+      ctx.fillStyle = '#444'; ctx.fillRect(0,0,1,1);
+      ctx.fillStyle = '#888'; ctx.fillRect(1,0,1,1);
+      ctx.fillStyle = '#ccc'; ctx.fillRect(2,0,1,1);
+      ctx.fillStyle = '#fff'; ctx.fillRect(3,0,1,1);
+      const tex = new THREE.CanvasTexture(c);
+      tex.minFilter = THREE.NearestFilter;
+      tex.magFilter = THREE.NearestFilter;
+      return tex;
+    }
+    const toonGradient = makeToonGradient();
+    function toonMat(color) {
+      return new THREE.MeshToonMaterial({ color, gradientMap: toonGradient });
+    }
+
     const BPM = 116, beat = 60 / BPM;
     const canvas = document.getElementById('canvas');
     const startScreen = document.getElementById('start-screen');
@@ -53,7 +73,7 @@
 
     const ambient = new THREE.AmbientLight(0xffffff, 0.5);
     scene.add(ambient);
-    const sunLight = new THREE.DirectionalLight(0xfff5e0, 1.0);
+    const sunLight = new THREE.DirectionalLight(0xfff5e0, 1.4);
     sunLight.position.set(15, 20, 10);
     scene.add(sunLight);
 
@@ -160,8 +180,8 @@
     // Dog
     function createDog() {
       const g = new THREE.Group();
-      const gray = new THREE.MeshStandardMaterial({ color: 0x6b7280, roughness: 0.55 });
-      const white = new THREE.MeshStandardMaterial({ color: 0xf8fafc });
+      const gray = toonMat(0x6b7280);
+      const white = toonMat(0xf8fafc);
       const torso = new THREE.Mesh(new THREE.CapsuleGeometry(0.34, 0.6, 6, 10), gray);
       torso.rotation.x = Math.PI/2; torso.position.y = 0.52; g.add(torso);
       const head = new THREE.Mesh(new THREE.SphereGeometry(0.28, 12, 12), gray);
@@ -170,9 +190,9 @@
       blaze.position.set(0, 0.88, 0.7); g.add(blaze);
       const muzzle = new THREE.Mesh(new THREE.SphereGeometry(0.13, 8, 8), white);
       muzzle.position.set(0, 0.68, 0.8); muzzle.scale.set(1.15, 0.75, 1.25); g.add(muzzle);
-      const nose = new THREE.Mesh(new THREE.SphereGeometry(0.045, 6, 6), new THREE.MeshStandardMaterial({ color: 0x1c1917 }));
+      const nose = new THREE.Mesh(new THREE.SphereGeometry(0.045, 6, 6), toonMat(0x1c1917));
       nose.position.set(0, 0.72, 0.92); g.add(nose);
-      const collar = new THREE.Mesh(new THREE.TorusGeometry(0.18, 0.03, 6, 12), new THREE.MeshStandardMaterial({ color: 0x2563eb }));
+      const collar = new THREE.Mesh(new THREE.TorusGeometry(0.18, 0.03, 6, 12), toonMat(0x2563eb));
       collar.rotation.x = Math.PI/2; collar.position.set(0, 0.62, 0.35); g.add(collar);
       const tail = new THREE.Mesh(new THREE.CapsuleGeometry(0.06, 0.28, 4, 6), gray);
       tail.position.set(0, 0.65, -0.45); tail.rotation.x = 0.5; g.add(tail); g.userData.tail = tail;
@@ -195,15 +215,15 @@
 
     function createPerson(scale, hair, shirt) {
       const g = new THREE.Group(); g.scale.setScalar(scale);
-      const body = new THREE.Mesh(new THREE.CapsuleGeometry(0.22, 0.55, 6, 8), new THREE.MeshStandardMaterial({ color: shirt }));
+      const body = new THREE.Mesh(new THREE.CapsuleGeometry(0.22, 0.55, 6, 8), toonMat(shirt));
       body.position.y = 0.9; g.add(body);
-      const head = new THREE.Mesh(new THREE.SphereGeometry(0.26, 10, 10), new THREE.MeshStandardMaterial({ color: 0xf5d0b5 }));
+      const head = new THREE.Mesh(new THREE.SphereGeometry(0.26, 10, 10), toonMat(0xf5d0b5));
       head.position.y = 1.48; g.add(head);
-      const hairM = new THREE.Mesh(new THREE.SphereGeometry(0.28, 8, 8), new THREE.MeshStandardMaterial({ color: hair }));
+      const hairM = new THREE.Mesh(new THREE.SphereGeometry(0.28, 8, 8), toonMat(hair));
       hairM.position.y = 1.6; hairM.scale.set(1, 0.65, 1); g.add(hairM);
       const arms = [], legs = [];
-      [-0.3, 0.3].forEach(x => { const a = new THREE.Mesh(new THREE.CapsuleGeometry(0.055, 0.35, 4, 6), new THREE.MeshStandardMaterial({ color: 0xf5d0b5 })); a.position.set(x, 0.95, 0); g.add(a); arms.push(a); });
-      [-0.11, 0.11].forEach(x => { const l = new THREE.Mesh(new THREE.CapsuleGeometry(0.07, 0.35, 4, 6), new THREE.MeshStandardMaterial({ color: 0x44403c })); l.position.set(x, 0.32, 0); g.add(l); legs.push(l); });
+      [-0.3, 0.3].forEach(x => { const a = new THREE.Mesh(new THREE.CapsuleGeometry(0.055, 0.35, 4, 6), toonMat(0xf5d0b5)); a.position.set(x, 0.95, 0); g.add(a); arms.push(a); });
+      [-0.11, 0.11].forEach(x => { const l = new THREE.Mesh(new THREE.CapsuleGeometry(0.07, 0.35, 4, 6), toonMat(0x44403c)); l.position.set(x, 0.32, 0); g.add(l); legs.push(l); });
       g.userData.arms = arms; g.userData.legs = legs;
       return g;
     }
