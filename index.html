@@ -1,0 +1,280 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Miloe, Come Home</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { overflow: hidden; background: #0a0a0a; font-family: 'Georgia', serif; color: #f5e6d3; }
+    #canvas { display: block; width: 100vw; height: 100vh; }
+    #overlay {
+      position: absolute; top: 0; left: 0; width: 100%; height: 100%;
+      pointer-events: none; display: flex; flex-direction: column; justify-content: space-between;
+      padding: 2rem;
+    }
+    #title {
+      font-size: 2.5rem; text-align: center; text-shadow: 0 0 20px rgba(255,180,100,0.6);
+      opacity: 0; transition: opacity 1.5s;
+    }
+    #lyrics {
+      font-size: 1.4rem; text-align: center; max-width: 800px; margin: 0 auto;
+      line-height: 1.6; text-shadow: 0 2px 10px rgba(0,0,0,0.8);
+      min-height: 4rem; opacity: 0.9;
+    }
+    #start-screen {
+      position: absolute; inset: 0; background: rgba(10,10,10,0.85);
+      display: flex; flex-direction: column; align-items: center; justify-content: center;
+      z-index: 10; cursor: pointer;
+    }
+    #start-screen h1 { font-size: 3rem; margin-bottom: 1rem; }
+    #start-screen p { font-size: 1.2rem; opacity: 0.8; }
+    .hidden { display: none !important; }
+  </style>
+</head>
+<body>
+  <canvas id="canvas"></canvas>
+  <div id="overlay">
+    <div id="title">Miloe, Come Home</div>
+    <div id="lyrics"></div>
+  </div>
+  <div id="start-screen">
+    <h1>Miloe, Come Home</h1>
+    <p>Click to begin · A song about waiting to adopt</p>
+  </div>
+
+  <script type="importmap">
+  {
+    "imports": {
+      "three": "https://unpkg.com/three@0.160.0/build/three.module.js",
+      "three/addons/": "https://unpkg.com/three@0.160.0/examples/jsm/"
+    }
+  }
+  </script>
+
+  <script type="module">
+    import * as THREE from 'three';
+
+    const canvas = document.getElementById('canvas');
+    const lyricsEl = document.getElementById('lyrics');
+    const titleEl = document.getElementById('title');
+    const startScreen = document.getElementById('start-screen');
+
+    const scene = new THREE.Scene();
+    scene.fog = new THREE.FogExp2(0x1a120c, 0.015);
+
+    const camera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 0.1, 1000);
+    camera.position.set(0, 2, 12);
+
+    const renderer = new THREE.WebGLRenderer({ canvas, antialias: true });
+    renderer.setSize(window.innerWidth, window.innerHeight);
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+    renderer.shadowMap.enabled = true;
+
+    // Lights
+    const ambient = new THREE.AmbientLight(0xffeedd, 0.4);
+    scene.add(ambient);
+    const warmLight = new THREE.PointLight(0xffaa66, 2, 30);
+    warmLight.position.set(0, 5, 0);
+    warmLight.castShadow = true;
+    scene.add(warmLight);
+    const coolLight = new THREE.PointLight(0x88aaff, 0.6, 20);
+    coolLight.position.set(-5, 3, 5);
+    scene.add(coolLight);
+
+    // Floor
+    const floorGeo = new THREE.PlaneGeometry(40, 40);
+    const floorMat = new THREE.MeshStandardMaterial({ color: 0x2a1f18, roughness: 0.9 });
+    const floor = new THREE.Mesh(floorGeo, floorMat);
+    floor.rotation.x = -Math.PI / 2;
+    floor.receiveShadow = true;
+    scene.add(floor);
+
+    // Particles for joy / pawprints / mess
+    const particleCount = 800;
+    const positions = new Float32Array(particleCount * 3);
+    const colors = new Float32Array(particleCount * 3);
+    for (let i = 0; i < particleCount; i++) {
+      positions[i*3] = (Math.random() - 0.5) * 30;
+      positions[i*3+1] = Math.random() * 8;
+      positions[i*3+2] = (Math.random() - 0.5) * 30;
+      const c = new THREE.Color().setHSL(0.08 + Math.random()*0.1, 0.6, 0.5 + Math.random()*0.3);
+      colors[i*3] = c.r; colors[i*3+1] = c.g; colors[i*3+2] = c.b;
+    }
+    const pGeo = new THREE.BufferGeometry();
+    pGeo.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+    pGeo.setAttribute('color', new THREE.BufferAttribute(colors, 3));
+    const pMat = new THREE.PointsMaterial({ size: 0.08, vertexColors: true, transparent: true, opacity: 0.7 });
+    const particles = new THREE.Points(pGeo, pMat);
+    scene.add(particles);
+
+    // Dog photo plane
+    const textureLoader = new THREE.TextureLoader();
+    const dogTexture = textureLoader.load('miloe-photo.jpg');
+    dogTexture.colorSpace = THREE.SRGBColorSpace;
+    const dogGeo = new THREE.PlaneGeometry(4, 5.5);
+    const dogMat = new THREE.MeshStandardMaterial({ map: dogTexture, transparent: true, opacity: 0, side: THREE.DoubleSide });
+    const dogPlane = new THREE.Mesh(dogGeo, dogMat);
+    dogPlane.position.set(0, 2.8, -2);
+    dogPlane.rotation.y = 0.1;
+    scene.add(dogPlane);
+
+    // Floating elements: hearts, socks, bowls (simple geometries)
+    const elements = [];
+    function addElement(geo, color, pos) {
+      const mat = new THREE.MeshStandardMaterial({ color, roughness: 0.5, metalness: 0.1 });
+      const mesh = new THREE.Mesh(geo, mat);
+      mesh.position.copy(pos);
+      mesh.castShadow = true;
+      mesh.userData.baseY = pos.y;
+      mesh.userData.phase = Math.random() * Math.PI * 2;
+      scene.add(mesh);
+      elements.push(mesh);
+      return mesh;
+    }
+    // Hearts
+    const heartShape = new THREE.Shape();
+    heartShape.moveTo(0, 0.5);
+    heartShape.bezierCurveTo(0, 0.8, -0.5, 1.1, -0.5, 0.5);
+    heartShape.bezierCurveTo(-0.5, 0, 0, -0.2, 0, -0.6);
+    heartShape.bezierCurveTo(0, -0.2, 0.5, 0, 0.5, 0.5);
+    heartShape.bezierCurveTo(0.5, 1.1, 0, 0.8, 0, 0.5);
+    const heartGeo = new THREE.ExtrudeGeometry(heartShape, { depth: 0.2, bevelEnabled: false });
+    for (let i = 0; i < 8; i++) {
+      addElement(heartGeo, 0xff6b6b, new THREE.Vector3((Math.random()-0.5)*12, 1 + Math.random()*4, (Math.random()-0.5)*10));
+    }
+    // Simple spheres as bowls / balls
+    for (let i = 0; i < 6; i++) {
+      addElement(new THREE.SphereGeometry(0.3, 16, 16), 0x8B4513, new THREE.Vector3((Math.random()-0.5)*15, 0.5 + Math.random()*3, (Math.random()-0.5)*12));
+    }
+    // Boxes as shoes / socks
+    for (let i = 0; i < 5; i++) {
+      addElement(new THREE.BoxGeometry(0.4, 0.2, 0.7), 0x4a3728, new THREE.Vector3((Math.random()-0.5)*14, 0.3 + Math.random()*2, (Math.random()-0.5)*10));
+    }
+
+    // Names floating as sprites or just text via CSS, but for 3D we can use simple planes later
+    const familyNames = ['Matt', 'Carly', 'Ella', 'Ava'];
+    // We'll show them in lyrics
+
+    // Audio setup
+    const audio = new Audio('miloe.m4a');
+    audio.loop = false;
+    audio.crossOrigin = 'anonymous';
+    let audioCtx, analyser, dataArray, source;
+    let started = false;
+
+    function initAudio() {
+      audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+      analyser = audioCtx.createAnalyser();
+      analyser.fftSize = 256;
+      source = audioCtx.createMediaElementSource(audio);
+      source.connect(analyser);
+      analyser.connect(audioCtx.destination);
+      dataArray = new Uint8Array(analyser.frequencyBinCount);
+    }
+
+    startScreen.addEventListener('click', async () => {
+      if (started) return;
+      started = true;
+      initAudio();
+      await audioCtx.resume();
+      audio.play();
+      startScreen.classList.add('hidden');
+      titleEl.style.opacity = 1;
+      setTimeout(() => titleEl.style.opacity = 0, 4000);
+    });
+
+    // Lyric sections with rough timings (total ~248s)
+    const sections = [
+      { t: 0, text: "Two years old, Staffordshire grin\nBig brown eyes at the shelter gate" },
+      { t: 18, text: "You lean in close, and I can tell\nYou’ve been waiting on your fate" },
+      { t: 35, text: "A little scar on your soft brave face\nA tail that swings like it knows my name" },
+      { t: 50, text: "If our house is the one you choose\nWe’ll never be the same" },
+      { t: 62, text: "I picture pawprints on the floor\nThe happy kind, the kind we’d keep" },
+      { t: 75, text: "I picture a heart that lands right here\nAnd finally goes to sleep" },
+      { t: 90, text: "Miloe, come home\nMiloe, come home" },
+      { t: 105, text: "If you spill a bowl, it’s alright\nLove can live in the mess tonight" },
+      { t: 120, text: "Matt and Carly, Ella and Ava\nWe’ve got room for all your joy" },
+      { t: 140, text: "Matt would laugh when you steal a sock\nCarly’d say, “That face again”" },
+      { t: 155, text: "Ella would race you down the hall\nAva’d be your best friend" },
+      { t: 170, text: "You might leave mud by the back door\nA chewed-up shoe by the chair" },
+      { t: 185, text: "But every little trail you make\nWould mean you were really there" },
+      { t: 198, text: "And every bark would shake the walls\nAnd every nap would fill the light" },
+      { t: 210, text: "So pick us, if you can\nPick these hands, these open days" },
+      { t: 222, text: "We’re not looking for perfect\nJust a dog to love all the way" },
+      { t: 235, text: "Miloe, come home\nWe’ve got room for all your joy" },
+    ];
+    let currentSection = 0;
+
+    function updateLyrics(time) {
+      while (currentSection < sections.length - 1 && time >= sections[currentSection + 1].t) {
+        currentSection++;
+      }
+      if (sections[currentSection]) {
+        lyricsEl.innerText = sections[currentSection].text;
+      }
+    }
+
+    // Animation
+    const clock = new THREE.Clock();
+    function animate() {
+      requestAnimationFrame(animate);
+      const t = clock.getElapsedTime();
+      const audioTime = audio.currentTime || 0;
+
+      // Audio reactivity
+      let bass = 0, mid = 0;
+      if (analyser) {
+        analyser.getByteFrequencyData(dataArray);
+        bass = dataArray.slice(0, 10).reduce((a,b)=>a+b,0) / 10 / 255;
+        mid = dataArray.slice(10, 40).reduce((a,b)=>a+b,0) / 30 / 255;
+      }
+
+      // Camera gentle float + bass pulse
+      camera.position.x = Math.sin(t * 0.15) * 2;
+      camera.position.y = 2 + Math.sin(t * 0.2) * 0.5 + bass * 0.8;
+      camera.lookAt(0, 1.5, 0);
+
+      // Particles react
+      particles.rotation.y = t * 0.05;
+      const pos = particles.geometry.attributes.position.array;
+      for (let i = 0; i < particleCount; i++) {
+        pos[i*3+1] += Math.sin(t + i) * 0.002 * (1 + mid * 3);
+        if (pos[i*3+1] > 8) pos[i*3+1] = 0;
+      }
+      particles.geometry.attributes.position.needsUpdate = true;
+      particles.material.size = 0.08 + bass * 0.15;
+
+      // Dog photo fades in around verse 1 end / chorus
+      const dogOpacity = Math.min(1, Math.max(0, (audioTime - 40) / 20));
+      dogMat.opacity = dogOpacity * (0.6 + mid * 0.4);
+      dogPlane.position.y = 2.8 + Math.sin(t * 0.5) * 0.15;
+      dogPlane.rotation.y = Math.sin(t * 0.3) * 0.15;
+
+      // Elements float and bounce to beat
+      elements.forEach((el, i) => {
+        el.position.y = el.userData.baseY + Math.sin(t * 1.2 + el.userData.phase) * 0.4 + bass * 1.5;
+        el.rotation.y = t * 0.3 + i;
+        el.rotation.x = Math.sin(t + i) * 0.2;
+      });
+
+      // Warm light pulses with bass
+      warmLight.intensity = 2 + bass * 4;
+
+      // Floor color shift slightly warmer over time
+      floorMat.color.setHSL(0.05, 0.3, 0.1 + audioTime / 1000);
+
+      updateLyrics(audioTime);
+
+      renderer.render(scene, camera);
+    }
+    animate();
+
+    window.addEventListener('resize', () => {
+      camera.aspect = window.innerWidth / window.innerHeight;
+      camera.updateProjectionMatrix();
+      renderer.setSize(window.innerWidth, window.innerHeight);
+    });
+  </script>
+</body>
+</html>
